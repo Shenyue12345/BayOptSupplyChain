@@ -2,76 +2,89 @@ import pymc3 as pm
 import matplotlib.pyplot as plt
 from pandas.plotting import table 
 import numpy as np
+from plotters import plot_gp_dist
 import warnings
 warnings.filterwarnings("ignore")
 class GP_model(object):
-    def __init__(self, noise = True, kernel_noise = False):
-        self.noise = noise
-        self.kernel_noise = kernel_noise
-        self.trace = None
+    def __init__(self, dim, x, y):
+        self.dim = dim
+        self.x = x
+        self.y = y
         self.scallop_model = pm.Model()
+        self.trace = None
         self.gp = None
 
-    def train(self, x, y, niter, random_seed=123, tune=500, cores = 4):
+    def train(self, niter = 1000, random_seed=123, tune=500, cores = 4):
         ### model training 
-        number_of_dim = 2
         with self.scallop_model:
             # hyperparameter priors
-            l = pm.InverseGamma("l", 5, 5)
-            sigma_f = pm.Normal("sigma_f", 0, 1)
+            l = pm.InverseGamma("l", 5, 5, shape = self.dim)
+            sigma_f = pm.HalfNormal("sigma_f", 1)
             
             # convariance function and marginal GP
-            if self.kernel_noise == False:
-                K = sigma_f** 2 * pm.gp.cov.ExpQuad(number_of_dim, ls = l)
-            else:
-                sigma_K = pm.HalfNormal("sigma_K",1)
-                K = sigma_f** 2 * pm.gp.cov.ExpQuad(number_of_dim, ls = l) + pm.gp.cov.WhiteNoise(sigma_K)
-            
+            K = sigma_f ** 2 * pm.gp.cov.ExpQuad(self.dim, ls = l)
+             
             self.gp = pm.gp.Marginal(cov_func=K)
     
             # marginal likelihood
             # convariance function and marginal GP
             sigma_n = pm.HalfNormal("sigma_n",1)
-            tot_catch = self.gp.marginal_likelihood("tot_catch", X = x, y = y, noise = sigma_n)
+            tot_catch = self.gp.marginal_likelihood("tot_catch", X = self.x, y = self.y, noise = sigma_n)
         
             # model fitting
             self.trace = pm.sample(niter, random_seed=random_seed, progressbar=True, tune=tune, cores = cores)
     
-    def plot_trace(self, save_file):
+    def plot_trace(self, save_file = None):
         pm.traceplot(self.trace)
-        fig = plt.gcf() # to get the current figure...
-        fig.savefig(save_file) # and save it directly
+        if save_file is not None:
+            fig = plt.gcf() # to get the current figure...
+            fig.savefig(save_file) # and save it directly
     
-    def print_summary(self, save_file):
+    def print_summary(self, save_file = None):
         trace_summary = pm.summary(self.trace)
         print(trace_summary)
-        ax = plt.subplot(111, frame_on=False) # no visible frame
-        ax.xaxis.set_visible(False)  # hide the x axis
-        ax.yaxis.set_visible(False)  # hide the y axis
+        if save_file is not None:
+            ax = plt.subplot(111, frame_on=False) # no visible frame
+            ax.xaxis.set_visible(False)  # hide the x axis
+            ax.yaxis.set_visible(False)  # hide the y axis
 
-        table(ax, trace_summary, loc='upper right')  # where df is your data frame
-        plt.savefig(save_file)
+            table(ax, trace_summary, loc='upper right')  # where df is your data frame
+            plt.savefig(save_file)
 
-    def predict_surface(self, X_new, pred_noise,samples):
+    def predict_GP(self, X_new, pred_noise,samples, pred_name):
         with self.scallop_model:
-            scallop_pred_1 = self.gp.conditional("scallop_pred_1",X_new,pred_noise = pred_noise)
-            scallop_samples = pm.sample_posterior_predictive(self.trace, vars = [scallop_pred_1],samples=samples)
+            scallop_pred = self.gp.conditional(pred_name,X_new,pred_noise = pred_noise)
+            scallop_samples = pm.sample_posterior_predictive(self.trace, vars = [scallop_pred],samples=samples)
         mu = np.zeros(len(X_new))
         sd = np.zeros(len(X_new))
 
         for i in range(0,len(X_new)):
-            mu[i] = np.mean(scallop_samples["scallop_pred_1"][:,i])
-            sd[i] = np.std(scallop_samples["scallop_pred_1"][:,i])
-        return mu, sd
+            mu[i] = np.mean(scallop_samples[pred_name][:,i])
+            sd[i] = np.std(scallop_samples[pred_name][:,i])
+        return mu, sd, scallop_samples
+    
+    def plot_range(self, X_new_long, X_new_lat, save_file = None):
+        _,_, sample_log_noise2 = self.predict_GP(X_new_long, pred_noise = True,samples = 100, pred_name = "long_noise")
+        _,_, sample_log2 = self.predict_GP(X_new_long, pred_noise = False,samples = 100, pred_name = "long")
+        _,_, sample_lat_noise2 = self.predict_GP(X_new_lat, pred_noise = True,samples = 100, pred_name = "lat_noise")
+        _,_, sample_lat2 = self.predict_GP(X_new_lat, pred_noise = False,samples = 100, pred_name = "lat")
+        
+        fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, sharey=True, figsize=(16,10))
 
-    def predict_test(self, X_new, pred_noise,samples):
-        with self.scallop_model:
-            scallop_pred_2 = self.gp.conditional("scallop_pred_2",X_new,pred_noise = pred_noise)
-            scallop_samples = pm.sample_posterior_predictive(self.trace, vars = [scallop_pred_2],samples=samples)
-            mu = np.zeros(len(X_new))
-        sd = np.zeros(len(X_new))
+        # plot the samples from the gp posterior with samples and shading
+        plot_gp_dist(ax1, sample_log_noise2["long_noise"], X_new_long[:,0]);
+        ax1.set_title(f"longtitude prediction with noise")
+        plot_gp_dist(ax2, sample_log2["long"], X_new_long[:,0]);
+        ax2.set_title(f"longtitude prediction without noise")
+        plot_gp_dist(ax3, sample_lat_noise2["lat_noise"], X_new_lat[:,1]);
+        ax3.set_title(f"latitude prediction with noise")
+        plot_gp_dist(ax4, sample_lat2["lat"], X_new_lat[:,1]);
+        ax4.set_title(f"latitude prediction without noise")
+        if save_file is not None:
+            fig = plt.gcf() # to get the current figure...
+            fig.savefig(save_file) # and save it directly
+    
+    
+    
 
-        for i in range(0,len(X_new)):
-            mu[i] = np.mean(scallop_samples["scallop_pred_2"][:,i])
-            sd[i] = np.std(scallop_samples["scallop_pred_2"][:,i])
-        return mu, sd
+

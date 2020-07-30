@@ -17,7 +17,7 @@ def generate_file(model_num):
     file_dict = {"data_file":"data/scallop.csv",
     "plot1":"plot/model" + str(model_num) +"/test_case.png",
     "plot2":"plot/model" + str(model_num) +"/summary.png",
-    "plot3":"plot/model" + str(model_num) +"/GP_surface.png",
-    "plot4":"plot/model" + str(model_num) +"/range_plot.png",
-    "plot5":"plot/model" + str(model_num) +"/trace_plot.png"}
+    "plot4":"plot/model" + str(model_num) +"/GP_surface.png",
+    "plot5":"plot/model" + str(model_num) +"/range_plot.png",
+    "plot3":"plot/model" + str(model_num) +"/trace_plot.png"}
     return file_dict

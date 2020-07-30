@@ -1,10 +1,14 @@
 import matplotlib.pyplot as plt
+import pandas as pd 
 import numpy as np 
-def plot_train_test(train, test, block_x, block_y, save_file = None):
+import random
+import warnings
+warnings.filterwarnings("ignore")
+def plot_train_test(train, test, block_x, block_y,group_num, save_file):
     '''
     plot how data are blocked, and show the train set and test set
     '''
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(12,5))
     c = ax.scatter(train["longitude"], train["latitude"], alpha=0.5,
             c=train["tot.catch"], cmap='viridis', label = "train")
     ax.scatter(test["longitude"], test["latitude"], alpha=0.5,
@@ -22,8 +26,40 @@ def plot_train_test(train, test, block_x, block_y, save_file = None):
     ax.legend(loc="upper left")
     ax.set_xlabel("longitude")
     ax.set_ylabel("latitude")
+    ax.set_title(f"total groups: {group_num}")
     if save_file is not None:
         plt.savefig(save_file)
+
+
+def plot_gp_dist(ax, samples:np.ndarray, x:np.ndarray, plot_samples=True, palette="Reds", fill_alpha=0.8, samples_alpha=0.1, fill_kwargs=None, samples_kwargs=None):
+    if fill_kwargs is None:
+        fill_kwargs = {}
+    if samples_kwargs is None:
+        samples_kwargs = {}
+    if np.any(np.isnan(samples)):
+        warnings.warn(
+            'There are `nan` entries in the [samples] arguments. '
+            'The plot will not contain a band!',
+            UserWarning
+        )
+
+    cmap = plt.get_cmap(palette)
+    percs = np.linspace(51, 99, 40)
+    colors = (percs - np.min(percs)) / (np.max(percs) - np.min(percs))
+    samples = samples.T
+    x = x.flatten()
+    for i, p in enumerate(percs[::-1]):
+        upper = np.percentile(samples, p, axis=1)
+        lower = np.percentile(samples, 100-p, axis=1)
+        color_val = colors[i]
+        ax.fill_between(x, upper, lower, color=cmap(color_val), alpha=fill_alpha, **fill_kwargs)
+    if plot_samples:
+        # plot a few samples
+        idx = np.random.randint(0, samples.shape[1], 30)
+        ax.plot(x, samples[:,idx], color=cmap(0.9), lw=1, alpha=samples_alpha,
+                **samples_kwargs)
+
+    return ax
 
 def plot_gp_2D(gx, gy, mu,sd, X_train, Y_train, X_test, Y_test, save_file = None):
     '''
@@ -34,14 +70,13 @@ def plot_gp_2D(gx, gy, mu,sd, X_train, Y_train, X_test, Y_test, save_file = None
     fig, (ax1, ax2) = plt.subplots(1, 2, sharey=True)
     c = ax1.pcolormesh(gx, gy,mu.reshape(gx.shape), vmin = z_min,vmax = z_max, alpha=0.2,cmap='viridis')
     ax1.scatter(X_train[:,0], X_train[:,1], alpha=0.2, c=Y_train, vmin = z_min,vmax = z_max,cmap='viridis')
-    ax1.scatter(X_test[:,0], X_test[:,1], marker='x', alpha=0.2, c=Y_test, cmap='viridis')
+    ax1.scatter(X_test[:,0], X_test[:,1], marker='x', alpha=0.2, cmap='viridis')
     fig.colorbar(c, ax = ax1)
     ax1.set_xlabel("longitude")
     ax1.set_ylabel("latitude")
     ax1.set_title("Posterior mean")
     
-    
-    
+     
     c = ax2.pcolormesh(gx, gy, sd.reshape(gx.shape), alpha=0.2, cmap='viridis')
     fig.colorbar(c, ax = ax2)
     ax2.set_xlabel("longitude")
@@ -50,44 +85,3 @@ def plot_gp_2D(gx, gy, mu,sd, X_train, Y_train, X_test, Y_test, save_file = None
 
     if save_file is not None:
         plt.savefig(save_file)
-
-def plot_gp_range(ax, mu, sd, gx, gy, step, ylabel, is_longitude = False):
-    """
-    if latitude is not None, grid should be gx, step should be y_step
-    otherwise, gy, x_step
-    """
-    if is_longitude: 
-        t = int((ylabel - np.min(gx)) // step)
-        label = f'Longitude {gx[t,1]}'
-        grid = gy
-    else:
-        t = int((ylabel - np.min(gy)) // step)
-        label = f'Latitude {gy[t,1]}'
-        grid = gx
-        
-    mu_new = mu.reshape(grid.shape)
-    sd_new = sd.reshape(grid.shape)
-    mu_plot = mu_new[t,:]
-    sd_plot = sd_new[t,:]
-    y = mu_plot
-    x = grid[1,:]
-    upper = y + 1.96 * sd_plot
-    lower = y - 1.96 * sd_plot
-    ax.plot(x, y, lw=1, ls='--')
-    ax.plot(x, upper, x, lower, color='blue')
-    ax.fill_between(x, upper, lower,alpha=0.1)
-    ax.set_title(label)
-    return ax
-
-def plot_gp_range_data(mu, sd, gx, gy,X, Y, save_file = None):
-    long = np.mean(X[:,0])
-    lat = np.mean(X[:,1])
-    _,(ax1,ax2) = plt.subplots(1,2)
-    plot_gp_range(ax1, mu, sd, gx, gy.T, gy[2,2] - gy[1,2], lat, is_longitude = False)
-    ax1.scatter(X[:,0], Y)
-    plot_gp_range(ax2, mu, sd, gx, gy.T, gx[1,2] - gx[1,1], long, is_longitude = True)
-    ax2.scatter(X[:,1], Y)
-    if save_file is not None:
-        plt.savefig(save_file)
-
-    
