@@ -6,4 +6,5 @@ Using Gaussian process to analysis the distribution of scallop in the ocean near
 ### SupplyChainSimulation
 I simulated a After-sales service supply chain and used Bayesian Optimization to optimize the total cost of the supply chain
 
-### Bay_Opt.ipnb
+### Bay_Opt.ipynb
+Using package PYMC3 to get fully bayesian Baysesian optimization. 
