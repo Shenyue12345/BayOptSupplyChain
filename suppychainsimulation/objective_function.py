@@ -5,7 +5,8 @@ from skopt.plots import plot_convergence
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.optimize import OptimizeResult
-
+from gp_constraint_min import BayeOptConstraint
+from BO_min import BayeOpt
 def objective_function_penalty(x, penalty, target_service_level,**kwargs):
     WarehouseA = get_sim_result(x, **kwargs)
     totalcost = 0
@@ -126,7 +127,8 @@ def print_result(days, r1):
         plot_convergence(r1)
         WarehouseA = get_sim_result(r1.x, days, plotdata = True)
         plot_warehouse(WarehouseA,days)
-    else:
+    elif isinstance(r1, BayeOptConstraint):
+
         plt.plot(list(range(r1.niter)), [np.min(r1.y_obj[0:x]) for x in range(1,1+  r1.niter)])
         idx = np.where(r1.y_constraint > 0)[0]
         plt.plot(idx - r1.n_restarts + 1, r1.y_obj[idx], "r.", label = "service level > 0.8")
@@ -137,4 +139,13 @@ def print_result(days, r1):
 
         WarehouseA = get_sim_result(r1.min_x, days, plotdata = True)
         plot_warehouse(WarehouseA,days)
+    elif isinstance(r1, BayeOpt):
+        plt.plot(list(range(r1.niter)), [np.min(r1.y_obj[0:x]) for x in range(1,1+  r1.niter)])
+        plt.xlabel('number of calls n')
+        plt.ylabel('min f(x) after n calls', fontsize=16)
+        plt.title("Convergence plot")
+
+        WarehouseA = get_sim_result(r1.min_x, days, plotdata = True)
+        plot_warehouse(WarehouseA,days)
+
 
