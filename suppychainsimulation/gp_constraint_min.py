@@ -48,20 +48,7 @@ class BayeOpt():
         print(self.y_constraint.shape, self.y_constraint)
     
     def expected_improvement(self, X, xi=0.01):
-        '''
-        Computes the EI at points X based on existing samples X_sample
-        and Y_sample using a Gaussian process surrogate model.
         
-        Args:
-            X: Points at which EI shall be computed (m x d).
-            X_sample: Sample locations (n x d).
-            Y_sample: Sample values (n x 1).
-            gpr: A GaussianProcessRegressor fitted to samples.
-            xi: Exploitation-exploration trade-off parameter.
-        
-        Returns:
-            Expected improvements at points X.
-        '''
         #print(X,self.gpr_obj.predict(X))
         mu_obj, sigma_obj = self.gpr_obj.predict(X, return_std=True)
         mu_constraint, sigma_constraint = self.gpr_constraint.predict(X, return_std=True)
@@ -88,18 +75,7 @@ class BayeOpt():
         return ei * FP
     
     def propose_location(self):
-        '''
-        Proposes the next sampling point by optimizing the acquisition function.
         
-        Args:
-            acquisition: Acquisition function.
-            X_sample: Sample locations (n x d).
-            Y_sample: Sample values (n x 1).
-            gpr: A GaussianProcessRegressor fitted to samples.
-
-        Returns:
-            Location of the acquisition function maximum.
-        '''
         dim = self.x.shape[1]
         min_val = 1
         min_x = None
@@ -107,8 +83,7 @@ class BayeOpt():
         def min_obj(X):
             # Minimization objective is the negative acquisition function
             return -1 * self.expected_improvement(X.reshape(-1, dim))
-            # return -acquisition(X, X_sample, Y_sample, gpr)
-        
+            
         # Find the best optimum by starting from n_restart different random points.
         for x0 in np.random.uniform(self.bounds[:, 0], self.bounds[:, 1], size=(self.n_restarts, dim)):
             #print("------------------------")
